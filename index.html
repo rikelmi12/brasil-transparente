@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brasil Transparente — Observatório Histórico de Dados & Governos (1990–2026)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- ======================== TOP HEADER ======================== -->
+  <header class="top-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-flag" title="Brasil Transparente">BR</div>
+        <div class="brand-title">
+          <h1>
+            Brasil Transparente
+            <span class="brand-badge">36 Indicadores • 1990–2026</span>
+          </h1>
+          <p>Observatório Completo: Educação, Segurança, Mortalidade, Saúde, Economia, Social & Presidência</p>
+        </div>
+      </div>
+
+      <nav class="main-nav" role="tablist">
+        <button class="nav-tab active" data-view="view-overview" onclick="switchView('view-overview')">
+          📊 Painel & Linha do Tempo
+        </button>
+        <button class="nav-tab" data-view="view-comparator" onclick="switchView('view-comparator')">
+          ⚖️ Comparar Presidentes
+        </button>
+        <button class="nav-tab" data-view="view-correlation" onclick="switchView('view-correlation')">
+          🔀 Cruzar Indicadores
+        </button>
+        <button class="nav-tab" data-view="view-governments" onclick="switchView('view-governments')">
+          🏛️ Raio-X dos Governos
+        </button>
+        <button class="nav-tab" data-view="view-states" onclick="switchView('view-states')">
+          🗺️ Estados (27 UFs)
+        </button>
+        <button class="nav-tab" data-view="view-table" onclick="switchView('view-table')">
+          📋 Base Completa & CSV
+        </button>
+      </nav>
+
+      <div class="header-actions">
+        <button class="btn-icon" id="btnThemeToggle" onclick="toggleTheme()" title="Alternar tema claro/escuro">
+          ☀️ Tema Claro
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ======================== MAIN APP CONTAINER ======================== -->
+  <main class="app-container">
+
+    <!-- LINHA DO TEMPO PRESIDENCIAL INTERATIVA (SEMPRE VISÍVEL NO TOPO) -->
+    <section class="presidents-strip-card">
+      <div class="strip-header">
+        <div class="strip-title">
+          <span>🏛️ Linha do Tempo da Presidência da República (Clique em um mandato para focar ou filtrar)</span>
+        </div>
+        <div class="strip-controls">
+          <div class="year-range-selector">
+            <span>Período:</span>
+            <select id="globalStartYear" onchange="onYearRangeChange()"></select>
+            <span>até</span>
+            <select id="globalEndYear" onchange="onYearRangeChange()"></select>
+          </div>
+          <button class="preset-chip" onclick="resetTimelineFilter()">🔄 Mostrar Todos (1990–2026)</button>
+        </div>
+      </div>
+      <div class="presidents-timeline" id="presidentsTimelineStrip"></div>
+    </section>
+
+    <!-- ======================================================================
+         VIEW 1: PAINEL PRINCIPAL & EXPLORADOR HISTÓRICO
+         ====================================================================== -->
+    <section id="view-overview" class="view-section active">
+
+      <!-- Barra de Categorias + Busca -->
+      <div class="category-bar">
+        <div class="category-pills" id="categoryPillsContainer"></div>
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="indicatorSearchInput" placeholder="Buscar indicador (ex: homicídios, ideb, pib, fome...)" oninput="renderIndicatorCardsGrid()" />
+        </div>
+      </div>
+
+      <!-- Grid Principal: Gráfico Interativo + Ranking Presidencial no Indicador -->
+      <div class="explorer-grid">
+
+        <!-- Coluna Esquerda: Gráfico Principal -->
+        <div class="panel-card">
+          <div class="chart-header">
+            <div class="indicator-selector-wrap">
+              <select id="mainIndicatorSelect" class="indicator-select" onchange="onMainIndicatorChange(this.value)"></select>
+              <div class="indicator-meta" id="mainIndicatorMeta"></div>
+            </div>
+
+            <div class="chart-toolbar">
+              <div class="tool-group" title="Modo de visualização dos valores">
+                <button class="tool-btn active" data-mode="raw" onclick="setMainValueMode('raw')">Valor Real</button>
+                <button class="tool-btn" data-mode="pct_change" onclick="setMainValueMode('pct_change')">Variação Anual (%)</button>
+                <button class="tool-btn" data-mode="mandate_avg" onclick="setMainValueMode('mandate_avg')">Média por Governo</button>
+              </div>
+              <div class="tool-group" title="Tipo de gráfico">
+                <button class="tool-btn active" data-chart="line" onclick="setMainChartType('line')">Linha</button>
+                <button class="tool-btn" data-chart="bar" onclick="setMainChartType('bar')">Barras</button>
+              </div>
+              <div class="tool-group">
+                <button class="tool-btn active" id="btnToggleBands" onclick="togglePresidentialBands()">🎨 Faixas de Governo</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="indicator-description" id="mainIndicatorDesc"></div>
+
+          <div class="chart-canvas-wrapper">
+            <canvas id="mainTimelineChart"></canvas>
+          </div>
+
+          <!-- 4 KPIs automáticos do indicador selecionado -->
+          <div class="kpi-strip" id="mainKpiStrip"></div>
+        </div>
+
+        <!-- Coluna Direita: Desempenho de Cada Presidente neste Indicador -->
+        <div class="panel-card">
+          <div class="mandate-perf-header">
+            <div>
+              <h3>🏆 Desempenho por Mandato Presidencial</h3>
+              <p style="font-size: 0.75rem; color: var(--text-muted);" id="mandatePerfSubtitle">
+                Como cada presidente recebeu e entregou este indicador
+              </p>
+            </div>
+            <div class="tool-group">
+              <button class="tool-btn active" id="btnSortChrono" onclick="setMandateRankSort('chrono')">Cronológico</button>
+              <button class="tool-btn" id="btnSortBest" onclick="setMandateRankSort('best')">Ranking Melhores</button>
+            </div>
+          </div>
+
+          <div class="mandate-perf-list" id="mandatePerformanceList"></div>
+        </div>
+      </div>
+
+      <!-- Grade de Todos os Indicadores com Mini-Gráficos (Sparklines) -->
+      <div class="section-heading">
+        <h2>📌 Todos os Indicadores do Brasil (<span id="indicatorCountLabel">36</span> disponíveis)</h2>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Clique em qualquer cartão para abrir no painel detalhado acima</span>
+      </div>
+      <div class="indicators-grid" id="allIndicatorsGrid"></div>
+
+    </section>
+
+    <!-- ======================================================================
+         VIEW 2: COMPARADOR DE PRESIDENTES (MANDATO VS MANDATO)
+         ====================================================================== -->
+    <section id="view-comparator" class="view-section">
+      <div class="comparator-controls">
+        <div class="section-heading" style="margin-bottom: 0.25rem;">
+          <h2>⚖️ Comparador Direto de Governos & Mandatos Presidenciais</h2>
+          <div class="tool-group">
+            <button class="tool-btn active" id="compMetricAvg" onclick="setComparatorCalcMode('avg')">Média no Mandato</button>
+            <button class="tool-btn" id="compMetricDelta" onclick="setComparatorCalcMode('delta')">Variação (Início → Fim)</button>
+            <button class="tool-btn" id="compMetricEnd" onclick="setComparatorCalcMode('end')">Valor na Entrega (Fim)</button>
+          </div>
+        </div>
+        <p style="font-size: 0.82rem; color: var(--text-muted);">
+          Selecione até 4 mandatos ou eras presidenciais para comparar todos os 36 indicadores de Educação, Segurança, Saúde/Mortalidade, Economia, Social e Meio Ambiente.
+        </p>
+
+        <!-- Presets Rápidos de Comparação -->
+        <div class="preset-chips">
+          <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted);">Comparações Rápidas:</span>
+          <button class="preset-chip" onclick="applyComparatorPreset(['lula1', 'lula2', 'bolsonaro', 'lula3'])">🔥 Lula 1 e 2 vs Bolsonaro vs Lula 3</button>
+          <button class="preset-chip" onclick="applyComparatorPreset(['fhc1', 'fhc2', 'lula1', 'lula2'])">📘 FHC (1 e 2) vs Lula (1 e 2)</button>
+          <button class="preset-chip" onclick="applyComparatorPreset(['dilma1', 'temer', 'bolsonaro', 'lula3'])">⚡ Dilma 1 vs Temer vs Bolsonaro vs Lula 3</button>
+          <button class="preset-chip" onclick="applyComparatorPreset(['era_fhc', 'era_lula_1_2', 'era_dilma', 'bolsonaro'])">🏛️ Eras Consolidadas: FHC vs Lula vs Dilma vs Bolsonaro</button>
+          <button class="preset-chip" onclick="applyComparatorPreset(['collor', 'itamar', 'fhc1', 'lula1'])">🕰️ Anos 90 e Transição (Collor / Itamar / FHC / Lula)</button>
+        </div>
+
+        <div class="comp-selectors-row">
+          <div class="comp-slot">
+            <label>Governo / Mandato 1</label>
+            <select id="compSelect1" onchange="renderComparatorView()"></select>
+          </div>
+          <div class="comp-slot">
+            <label>Governo / Mandato 2</label>
+            <select id="compSelect2" onchange="renderComparatorView()"></select>
+          </div>
+          <div class="comp-slot">
+            <label>Governo / Mandato 3</label>
+            <select id="compSelect3" onchange="renderComparatorView()"></select>
+          </div>
+          <div class="comp-slot">
+            <label>Governo / Mandato 4 (Opcional)</label>
+            <select id="compSelect4" onchange="renderComparatorView()"></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Placar Resumo dos Governos Selecionados -->
+      <div class="scoreboard-cards" id="comparatorScoreboard"></div>
+
+      <!-- Gráficos do Comparador: Radar de Desempenho por Área + Gráfico de Barras do Indicador Escolhido -->
+      <div class="comp-dashboard-grid">
+        <div class="panel-card">
+          <div class="section-heading">
+            <h3>🎯 Radar Multidimensional (Índice 0 a 100 por Área)</h3>
+          </div>
+          <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+            Pontuação normalizada onde <strong>100 é o melhor desempenho histórico</strong> do Brasil e 0 o mais crítico em cada eixo temático.
+          </p>
+          <div class="chart-canvas-wrapper" style="height: 360px;">
+            <canvas id="comparatorRadarChart"></canvas>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="section-heading">
+            <h3>📊 Comparação Visual por Indicador</h3>
+            <select id="compBarIndicatorSelect" class="indicator-select" style="max-width: 320px; font-size: 0.85rem; margin-bottom: 0;" onchange="renderComparatorBarChart()"></select>
+          </div>
+          <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.75rem;" id="compBarHelperText">
+            Comparando todos os 11 mandatos presidenciais lado a lado neste indicador.
+          </p>
+          <div class="chart-canvas-wrapper" style="height: 360px;">
+            <canvas id="comparatorBarChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela Completa dos 36 Indicadores nos Governos Selecionados -->
+      <div class="table-container">
+        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <h3 style="font-size: 1rem; font-weight: 800;">📋 Comparativo Completo nos 36 Indicadores</h3>
+            <span style="font-size: 0.78rem; color: var(--text-muted);">A célula destacada em verde indica o melhor resultado entre os governos selecionados para cada indicador</span>
+          </div>
+          <select id="compTableCategoryFilter" onchange="renderComparatorTable()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.45rem 0.75rem; border-radius: 6px; font-weight: 600;">
+            <option value="all">Todas as Categorias (36)</option>
+            <option value="educacao">🎓 Educação & Ciência</option>
+            <option value="seguranca">🛡️ Segurança Pública</option>
+            <option value="saude">🏥 Saúde & Mortalidade</option>
+            <option value="economia">📈 Economia & Emprego</option>
+            <option value="social">🤝 Social & Desigualdade</option>
+            <option value="ambiente">🌱 Meio Ambiente & Infra</option>
+          </select>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table" id="comparatorFullTable"></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         VIEW 3: CRUZAMENTO DE INDICADORES & CORRELAÇÃO
+         ====================================================================== -->
+    <section id="view-correlation" class="view-section">
+      <div class="correlation-controls">
+        <div>
+          <label style="display:block; font-size:0.75rem; font-weight:700; color:var(--text-muted); margin-bottom:0.35rem; text-transform:uppercase;">
+            Indicador A (Eixo Esquerdo / X)
+          </label>
+          <select id="corrSelectA" class="indicator-select" style="margin-bottom:0;" onchange="renderCorrelationView()"></select>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.75rem; font-weight:700; color:var(--text-muted); margin-bottom:0.35rem; text-transform:uppercase;">
+            Indicador B (Eixo Direito / Y)
+          </label>
+          <select id="corrSelectB" class="indicator-select" style="margin-bottom:0;" onchange="renderCorrelationView()"></select>
+        </div>
+        <div class="tool-group">
+          <button class="tool-btn active" id="corrScaleDual" onclick="setCorrelationScaleMode('dual')">Eixo Duplo Real</button>
+          <button class="tool-btn" id="corrScaleNorm" onclick="setCorrelationScaleMode('norm')">Índice Base 0-100</button>
+        </div>
+      </div>
+
+      <!-- Sugestões de Cruzamentos Interessantes -->
+      <div class="preset-chips" style="margin-bottom: 1.25rem; margin-top: -0.5rem;">
+        <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted);">Cruzamentos Sugeridos:</span>
+        <button class="preset-chip" onclick="setCorrelationPair('gasto_educacao_pib', 'ideb_iniciais')">🎓 Gasto em Educação vs IDEB</button>
+        <button class="preset-chip" onclick="setCorrelationPair('salario_minimo_real', 'pobreza_taxa')">💰 Salário Mínimo Real vs Pobreza</button>
+        <button class="preset-chip" onclick="setCorrelationPair('desemprego', 'homicidios_taxa')">🛡️ Desemprego vs Taxa de Homicídios</button>
+        <button class="preset-chip" onclick="setCorrelationPair('saneamento_esgoto', 'mortalidade_infantil')">🏥 Saneamento Básico vs Mortalidade Infantil</button>
+        <button class="preset-chip" onclick="setCorrelationPair('desmatamento_amazonia', 'emissoes_co2')">🌱 Desmatamento vs Emissões de CO2</button>
+        <button class="preset-chip" onclick="setCorrelationPair('mortalidade_geral', 'expectativa_vida')">❤️ Mortalidade Geral vs Expectativa de Vida</button>
+      </div>
+
+      <div class="corr-stats-banner" id="correlationStatsBanner"></div>
+
+      <div class="explorer-grid">
+        <div class="panel-card">
+          <div class="section-heading">
+            <h3>📈 Evolução Conjunta ao Longo dos Governos (1990–2026)</h3>
+          </div>
+          <div class="chart-canvas-wrapper">
+            <canvas id="correlationLineChart"></canvas>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="section-heading">
+            <h3>🔵 Dispersão (Cada Ponto = 1 Ano colorido pelo Presidente)</h3>
+          </div>
+          <div class="chart-canvas-wrapper">
+            <canvas id="correlationScatterChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         VIEW 4: RAIO-X COMPLETO DE CADA GOVERNO (FICHAS PRESIDENCIAIS)
+         ====================================================================== -->
+    <section id="view-governments" class="view-section">
+      <div class="section-heading">
+        <div>
+          <h2>🏛️ Raio-X Histórico dos Mandatos Presidenciais (1990–2026)</h2>
+          <p style="font-size: 0.84rem; color: var(--text-muted);">
+            Análise automática dos maiores avanços, principais recuos, marcos históricos e balanço de indicadores de cada presidente.
+          </p>
+        </div>
+      </div>
+      <div class="gov-profiles-grid" id="governmentProfilesContainer"></div>
+    </section>
+
+    <!-- ======================================================================
+         VIEW 5: ESTADOS & REGIÕES (27 UFs)
+         ====================================================================== -->
+    <section id="view-states" class="view-section">
+      <div class="comparator-controls">
+        <div class="section-heading" style="margin-bottom: 0.5rem;">
+          <div>
+            <h2>🗺️ Radiografia dos 27 Estados Brasileiros (UFs & Regiões)</h2>
+            <p style="font-size: 0.82rem; color: var(--text-muted);">
+              Compare todos os estados do Brasil em Educação (IDEB, Analfabetismo), Segurança (Homicídios), Saúde (Expectativa de Vida, Mortalidade Infantil), PIB per capita e Saneamento.
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+            <select id="stateMetricSelect" class="indicator-select" style="width: auto; min-width: 260px; margin-bottom: 0;" onchange="renderStatesView()"></select>
+            <select id="stateRegionFilter" class="indicator-select" style="width: auto; min-width: 170px; margin-bottom: 0;" onchange="renderStatesView()">
+              <option value="all">Todas as Regiões (27 UFs)</option>
+              <option value="Norte">Região Norte (7)</option>
+              <option value="Nordeste">Região Nordeste (9)</option>
+              <option value="Centro-Oeste">Região Centro-Oeste (4)</option>
+              <option value="Sudeste">Região Sudeste (4)</option>
+              <option value="Sul">Região Sul (3)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="explorer-grid">
+        <div class="panel-card">
+          <div class="section-heading">
+            <h3 id="stateChartTitle">📊 Ranking Estadual</h3>
+          </div>
+          <div class="chart-canvas-wrapper" style="height: 520px;">
+            <canvas id="statesBarChart"></canvas>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="section-heading">
+            <h3>🏆 Tabela Comparativa das 27 UFs</h3>
+          </div>
+          <div class="table-scroll" style="max-height: 520px;">
+            <table class="data-table" id="statesRankingTable"></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         VIEW 6: TABELA GERAL DE DADOS BRUTOS & EXPORTAÇÃO CSV
+         ====================================================================== -->
+    <section id="view-table" class="view-section">
+      <div class="table-container">
+        <div style="padding: 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 style="font-size: 1.1rem; font-weight: 800;">📋 Matriz Histórica Completa (1990–2026 • Todos os Anos, Presidentes e Indicadores)</h2>
+            <p style="font-size: 0.8rem; color: var(--text-muted);">
+              Consulte todos os números anuais lado a lado ou exporte a base completa em formato CSV para Excel / Google Sheets.
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+            <select id="rawTableCategorySelect" onchange="renderRawDataTable()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.5rem 0.8rem; border-radius: 8px; font-weight: 600;">
+              <option value="all">Todas as Categorias (36 Indicadores)</option>
+              <option value="educacao">🎓 Educação & Ciência</option>
+              <option value="seguranca">🛡️ Segurança Pública</option>
+              <option value="saude">🏥 Saúde & Mortalidade</option>
+              <option value="economia">📈 Economia & Emprego</option>
+              <option value="social">🤝 Social & Desigualdade</option>
+              <option value="ambiente">🌱 Meio Ambiente & Infra</option>
+            </select>
+            <button class="btn-icon" onclick="exportFullDatasetCSV()" style="background: var(--accent-green); color: #fff; border-color: var(--accent-green);">
+              📥 Baixar CSV Completo
+            </button>
+          </div>
+        </div>
+        <div class="table-scroll" style="max-height: 680px;">
+          <table class="data-table" id="rawHistoricalTable"></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="app-footer">
+      <div>
+        <strong>Brasil Transparente</strong> — Plataforma Interativa de Visualização Histórica (1990–2026).
+        Dados compilados de séries históricas oficiais: IBGE, DATASUS, IPEA, Atlas da Violência (FBSP), INEP/MEC, Banco Central, INPE e PNUD.
+      </div>
+      <div>
+        Nota metodológica: Indicadores estruturais sofrem efeito de defasagem temporal, ciclos econômicos globais e choques externos (ex: Pandemia em 2020–2021).
+      </div>
+    </footer>
+
+  </main>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
