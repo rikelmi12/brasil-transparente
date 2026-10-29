@@ -1544,7 +1544,7 @@ function renderGovernmentProfilesView() {
       <p class="gov-context">${m.context}</p>
 
       <!-- Resumo de 4 Pilares Rápidos -->
-      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:0.5rem;">
+      <div class="gov-quick-kpis">
         <div class="kpi-box" style="padding:0.5rem;">
           <div class="kpi-label" style="font-size:0.65rem;">PIB Médio</div>
           <div class="kpi-val" style="font-size:0.95rem;">${pibSt.avg >= 0 ? '+' : ''}${pibSt.avg.toFixed(1)}%</div>
