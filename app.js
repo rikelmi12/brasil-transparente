@@ -221,15 +221,17 @@ const presidentialBandsPlugin = {
       ctx.lineTo(xStart, chartArea.bottom);
       ctx.stroke();
 
-      // Rótulo do presidente no topo da faixa
-      if (width > 30) {
+      // Rótulo do presidente no topo da faixa (adaptativo para PC e Mobile)
+      if (width > 15) {
+        const isNarrowChart = chartArea.width < 460;
         ctx.fillStyle = isHighlighted
           ? m.color
           : (APP_STATE.theme === 'dark' ? '#e2e8f0' : '#1e293b');
-        ctx.font = `${isHighlighted ? '800' : '700'} 10px Inter, sans-serif`;
+        const fontSize = isNarrowChart ? 8.5 : 10;
+        ctx.font = `${isHighlighted ? '800' : '700'} ${fontSize}px Inter, sans-serif`;
         ctx.textAlign = 'center';
-        const labelText = width > 62 ? m.shortName : m.avatar;
-        ctx.fillText(labelText, xStart + width / 2, chartArea.top + 13);
+        const labelText = width > 56 ? m.shortName : m.avatar;
+        ctx.fillText(labelText, xStart + width / 2, chartArea.top + (isNarrowChart ? 11 : 13));
       }
     });
 
@@ -240,8 +242,11 @@ const presidentialBandsPlugin = {
 Chart.register(presidentialBandsPlugin);
 
 // ============================================================================
-// INICIALIZAÇÃO GERAL DO APP
+// INICIALIZAÇÃO GERAL DO APP & REDIMENSIONAMENTO RESPONSIVO
 // ============================================================================
+
+let lastViewportWidth = window.innerWidth;
+let resizeTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   initYearSelectors();
@@ -255,6 +260,21 @@ document.addEventListener('DOMContentLoaded', () => {
   renderGovernmentProfilesView();
   renderStatesView();
   renderRawDataTable();
+
+  // Re-renderiza gráficos apenas quando a largura real da tela muda (ex: rotação mobile),
+  // ignorando variações apenas verticais da barra de endereço no iOS/Android
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (Math.abs(window.innerWidth - lastViewportWidth) > 12) {
+        lastViewportWidth = window.innerWidth;
+        if (APP_STATE.currentView === 'view-overview') renderOverviewPanel();
+        if (APP_STATE.currentView === 'view-comparator') renderComparatorView();
+        if (APP_STATE.currentView === 'view-correlation') renderCorrelationView();
+        if (APP_STATE.currentView === 'view-states') renderStatesView();
+      }
+    }, 180);
+  });
 });
 
 function initYearSelectors() {
@@ -356,7 +376,11 @@ function switchView(viewId) {
     sec.classList.toggle('active', sec.id === viewId);
   });
   document.querySelectorAll('.nav-tab').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.view === viewId);
+    const isActive = btn.dataset.view === viewId;
+    btn.classList.toggle('active', isActive);
+    if (isActive && typeof btn.scrollIntoView === 'function') {
+      btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
   });
 
   // Redimensiona gráficos ativos se necessário
@@ -368,12 +392,15 @@ function switchView(viewId) {
 
 function toggleTheme() {
   APP_STATE.theme = APP_STATE.theme === 'dark' ? 'light' : 'dark';
+  const metaTheme = document.getElementById('metaThemeColor');
   if (APP_STATE.theme === 'light') {
     document.documentElement.setAttribute('data-theme', 'light');
     document.getElementById('btnThemeToggle').innerHTML = '🌙 Tema Escuro';
+    if (metaTheme) metaTheme.setAttribute('content', '#f1f5f9');
   } else {
     document.documentElement.removeAttribute('data-theme');
     document.getElementById('btnThemeToggle').innerHTML = '☀️ Tema Claro';
+    if (metaTheme) metaTheme.setAttribute('content', '#090d16');
   }
   renderOverviewPanel();
   if (APP_STATE.currentView === 'view-comparator') renderComparatorView();
@@ -393,6 +420,7 @@ function renderPresidentsTimelineStrip() {
     const isActive = APP_STATE.highlightedMandateId === m.id;
     const pill = document.createElement('button');
     pill.className = `president-pill ${isActive ? 'active' : ''}`;
+    pill.dataset.mandateId = m.id;
     pill.style.setProperty('--pres-color', m.color);
     pill.style.setProperty('--pres-bg', m.bgLight);
     pill.title = `${m.fullName} (${m.exactPeriod}) — Clique para destacar este governo nos gráficos`;
@@ -419,12 +447,21 @@ function renderPresidentsTimelineStrip() {
         }
       }
       renderPresidentsTimelineStrip();
+      scrollActivePresidentPillIntoView();
       renderOverviewPanel();
       if (APP_STATE.currentView === 'view-correlation') renderCorrelationView();
     };
 
     container.appendChild(pill);
   });
+}
+
+function scrollActivePresidentPillIntoView() {
+  if (!APP_STATE.highlightedMandateId) return;
+  const activePill = document.querySelector(`.president-pill[data-mandate-id="${APP_STATE.highlightedMandateId}"]`);
+  if (activePill && typeof activePill.scrollIntoView === 'function') {
+    activePill.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
 }
 
 function onYearRangeChange() {
@@ -470,12 +507,17 @@ function renderCategoryPills() {
 
     const btn = document.createElement('button');
     btn.className = `cat-btn ${APP_STATE.selectedCategory === cat.id ? 'active' : ''}`;
+    btn.dataset.catId = cat.id;
     btn.style.setProperty('--cat-color', cat.color);
     btn.innerHTML = `${cat.icon} ${cat.name} <span style="opacity:0.75; font-size:0.72rem;">(${count})</span>`;
     btn.onclick = () => {
       APP_STATE.selectedCategory = cat.id;
       renderCategoryPills();
       renderIndicatorCardsGrid();
+      const activeCatBtn = container.querySelector(`.cat-btn[data-cat-id="${cat.id}"]`);
+      if (activeCatBtn && typeof activeCatBtn.scrollIntoView === 'function') {
+        activeCatBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
     };
     container.appendChild(btn);
   });
@@ -533,9 +575,9 @@ function renderOverviewPanel() {
 
   document.getElementById('mainIndicatorMeta').innerHTML = `
     <span style="color:${cat.color}; font-weight:700;">${cat.icon} ${cat.name}</span>
-    <span>•</span>
+    <span class="meta-sep">•</span>
     <span>Unidade: <strong>${ind.unit}</strong></span>
-    <span>•</span>
+    <span class="meta-sep">•</span>
     <span>Fonte: <strong>${ind.source}</strong></span>
     ${polarityHtml}
   `;
@@ -559,13 +601,18 @@ function renderMainChart(ind, cat) {
     mainChartInstance.destroy();
   }
 
+  const isMobile = window.innerWidth <= 640;
   const textColor = APP_STATE.theme === 'dark' ? '#cbd5e1' : '#334155';
   const gridColor = APP_STATE.theme === 'dark' ? 'rgba(148, 163, 184, 0.1)' : 'rgba(15, 23, 42, 0.08)';
 
   // Modo 3: Média por Governo (Barras por Mandato)
   if (APP_STATE.mainValueMode === 'mandate_avg') {
     const mandateStats = MANDATES.map(m => computeMandateIndicatorStats(ind, m));
-    const labels = mandateStats.map(ms => `${ms.mandate.shortName} (${ms.mandate.startYear}-${String(ms.mandate.endYear).slice(2)})`);
+    const labels = mandateStats.map(ms =>
+      isMobile
+        ? ms.mandate.shortName
+        : `${ms.mandate.shortName} (${ms.mandate.startYear}-${String(ms.mandate.endYear).slice(2)})`
+    );
     const dataVals = mandateStats.map(ms => Number(ms.avg.toFixed(ind.decimals)));
     const bgColors = mandateStats.map(ms =>
       APP_STATE.highlightedMandateId && APP_STATE.highlightedMandateId !== ms.mandate.id
@@ -582,8 +629,8 @@ function renderMainChart(ind, cat) {
           data: dataVals,
           backgroundColor: bgColors,
           borderColor: mandateStats.map(ms => ms.mandate.color),
-          borderWidth: 2,
-          borderRadius: 6
+          borderWidth: isMobile ? 1.5 : 2,
+          borderRadius: isMobile ? 4 : 6
         }]
       },
       options: {
@@ -593,11 +640,14 @@ function renderMainChart(ind, cat) {
           presidentialBands: { enabled: false },
           legend: { display: false },
           tooltip: {
+            padding: isMobile ? 8 : 12,
+            titleFont: { size: isMobile ? 11 : 12 },
+            bodyFont: { size: isMobile ? 11 : 12 },
             callbacks: {
               label: (context) => {
                 const ms = mandateStats[context.dataIndex];
                 return [
-                  `Média no Governo: ${formatValue(ms.avg, ind.decimals, ind.unit)}`,
+                  `Média: ${formatValue(ms.avg, ind.decimals, ind.unit)}`,
                   `Início (${ms.mandate.startYear}): ${formatValue(ms.startVal, ind.decimals, ind.unit)}`,
                   `Entrega (${ms.mandate.endYear}): ${formatValue(ms.endVal, ind.decimals, ind.unit)}`,
                   `Variação: ${ms.deltaAbs >= 0 ? '+' : ''}${formatValue(ms.deltaAbs, ind.decimals, ind.unit)}`
@@ -607,8 +657,23 @@ function renderMainChart(ind, cat) {
           }
         },
         scales: {
-          x: { ticks: { color: textColor, font: { weight: '600', size: 11 } }, grid: { display: false } },
-          y: { ticks: { color: textColor }, grid: { color: gridColor } }
+          x: {
+            ticks: {
+              color: textColor,
+              font: { weight: '600', size: isMobile ? 9.5 : 11 },
+              maxRotation: isMobile ? 45 : 0,
+              minRotation: isMobile ? 30 : 0
+            },
+            grid: { display: false }
+          },
+          y: {
+            ticks: {
+              color: textColor,
+              font: { size: isMobile ? 9.5 : 11 },
+              maxTicksLimit: isMobile ? 6 : 9
+            },
+            grid: { color: gridColor }
+          }
         }
       }
     });
@@ -640,7 +705,7 @@ function renderMainChart(ind, cat) {
     const mObj = getMandateOrEraById(mId);
     const isHl = APP_STATE.highlightedMandateId === mId;
     pointColors.push(mObj ? mObj.color : cat.color);
-    pointRadii.push(isHl ? 6.5 : 4);
+    pointRadii.push(isHl ? (isMobile ? 5 : 6.5) : (isMobile ? 2.5 : 4));
   });
 
   const isBar = APP_STATE.mainChartType === 'bar';
@@ -666,11 +731,11 @@ function renderMainChart(ind, cat) {
             },
         pointBackgroundColor: pointColors,
         pointBorderColor: '#ffffff',
-        pointBorderWidth: 1.5,
+        pointBorderWidth: isMobile ? 1 : 1.5,
         pointRadius: pointRadii,
-        pointHoverRadius: 8,
-        borderWidth: isBar ? 1.5 : 3,
-        borderRadius: isBar ? 4 : 0,
+        pointHoverRadius: isMobile ? 6 : 8,
+        borderWidth: isBar ? (isMobile ? 1 : 1.5) : (isMobile ? 2.2 : 3),
+        borderRadius: isBar ? (isMobile ? 3 : 4) : 0,
         fill: !isBar,
         tension: 0.28
       }]
@@ -695,16 +760,22 @@ function renderMainChart(ind, cat) {
           bodyColor: '#e2e8f0',
           borderColor: 'rgba(148, 163, 184, 0.3)',
           borderWidth: 1,
-          padding: 12,
+          padding: isMobile ? 8 : 12,
+          titleFont: { size: isMobile ? 11 : 12 },
+          bodyFont: { size: isMobile ? 11 : 12 },
           callbacks: {
             title: (items) => {
               const yr = Number(items[0].label);
               const mId = YEAR_TO_MANDATE[yr];
               const mObj = getMandateOrEraById(mId);
-              const presLabel = yr === 2016
-                ? 'Dilma Rousseff (jan-ago) / Michel Temer (set-dez)'
-                : `${mObj.name} (${mObj.party})`;
-              return `Ano ${yr} — Presidência: ${presLabel}`;
+              if (yr === 2016) {
+                return isMobile
+                  ? [`Ano ${yr}`, 'Dilma (jan-ago) / Temer (set-dez)']
+                  : 'Ano 2016 — Presidência: Dilma Rousseff (jan-ago) / Michel Temer (set-dez)';
+              }
+              return isMobile
+                ? `Ano ${yr} • ${mObj.name} (${mObj.party})`
+                : `Ano ${yr} — Presidência: ${mObj.name} (${mObj.party})`;
             },
             label: (context) => {
               const yr = Number(context.label);
@@ -726,12 +797,20 @@ function renderMainChart(ind, cat) {
       },
       scales: {
         x: {
-          ticks: { color: textColor, maxRotation: 0, autoSkip: true, maxTicksLimit: 18 },
+          ticks: {
+            color: textColor,
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: isMobile ? 8 : 18,
+            font: { size: isMobile ? 9.5 : 11 }
+          },
           grid: { color: gridColor }
         },
         y: {
           ticks: {
             color: textColor,
+            font: { size: isMobile ? 9.5 : 11 },
+            maxTicksLimit: isMobile ? 6 : 10,
             callback: (val) => APP_STATE.mainValueMode === 'pct_change' ? `${val}%` : formatValue(val, ind.decimals, '')
           },
           grid: { color: gridColor }
@@ -869,6 +948,7 @@ function renderMandatePerformanceList() {
     row.onclick = () => {
       APP_STATE.highlightedMandateId = APP_STATE.highlightedMandateId === m.id ? null : m.id;
       renderPresidentsTimelineStrip();
+      scrollActivePresidentPillIntoView();
       renderOverviewPanel();
     };
 
@@ -984,7 +1064,13 @@ function renderIndicatorCardsGrid() {
 
     card.onclick = () => {
       onMainIndicatorChange(ind.id);
-      window.scrollTo({ top: 120, behavior: 'smooth' });
+      const headerEl = document.querySelector('.top-header');
+      const headerH = headerEl ? headerEl.offsetHeight : 70;
+      const gridEl = document.getElementById('mainExplorerGrid');
+      const targetY = gridEl
+        ? gridEl.getBoundingClientRect().top + window.scrollY - headerH - 10
+        : 120;
+      window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
     };
 
     container.appendChild(card);
@@ -1098,8 +1184,21 @@ function renderComparatorRadarChart(govs) {
   const ctx = document.getElementById('comparatorRadarChart').getContext('2d');
   if (compRadarChartInstance) compRadarChartInstance.destroy();
 
+  const isMobile = window.innerWidth <= 640;
   const cats = CATEGORIES.filter(c => c.id !== 'all');
-  const labels = cats.map(c => `${c.icon} ${c.name.split('&')[0].trim()}`);
+  const mobileCatNames = {
+    educacao: 'Educação',
+    seguranca: 'Segurança',
+    saude: 'Saúde',
+    economia: 'Economia',
+    social: 'Social',
+    ambiente: 'Ambiente'
+  };
+  const labels = cats.map(c =>
+    isMobile
+      ? `${c.icon} ${mobileCatNames[c.id] || c.name.split('&')[0].trim()}`
+      : `${c.icon} ${c.name.split('&')[0].trim()}`
+  );
 
   // Calcula nota de 0 a 100 para cada governo em cada categoria comparando contra todos os 11 mandatos históricos
   const datasets = govs.map(g => {
@@ -1124,7 +1223,8 @@ function renderComparatorRadarChart(govs) {
       borderColor: g.color,
       backgroundColor: g.color + '28',
       pointBackgroundColor: g.color,
-      borderWidth: 2.5
+      pointRadius: isMobile ? 2.5 : 3.5,
+      borderWidth: isMobile ? 2 : 2.5
     };
   });
 
@@ -1144,14 +1244,19 @@ function renderComparatorRadarChart(govs) {
           ticks: { stepSize: 25, display: false },
           grid: { color: gridColor },
           angleLines: { color: gridColor },
-          pointLabels: { color: textColor, font: { size: 11, weight: '700' } }
+          pointLabels: { color: textColor, font: { size: isMobile ? 9.5 : 11, weight: '700' } }
         }
       },
       plugins: {
         presidentialBands: { enabled: false },
         legend: {
           position: 'bottom',
-          labels: { color: textColor, font: { weight: '700' } }
+          labels: {
+            color: textColor,
+            boxWidth: isMobile ? 10 : 24,
+            padding: isMobile ? 8 : 12,
+            font: { size: isMobile ? 10.5 : 12, weight: '700' }
+          }
         }
       }
     }
@@ -1162,6 +1267,7 @@ function renderComparatorBarChart() {
   const ctx = document.getElementById('comparatorBarChart').getContext('2d');
   if (compBarChartInstance) compBarChartInstance.destroy();
 
+  const isMobile = window.innerWidth <= 640;
   const indId = document.getElementById('compBarIndicatorSelect').value;
   const ind = getIndicatorById(indId);
   const selectedGovIds = getSelectedComparatorGovernments().map(g => g.id);
@@ -1186,8 +1292,8 @@ function renderComparatorBarChart() {
         data: values,
         backgroundColor: colors,
         borderColor: statsAll.map(s => s.mandate.color),
-        borderWidth: 2,
-        borderRadius: 6
+        borderWidth: isMobile ? 1.5 : 2,
+        borderRadius: isMobile ? 4 : 6
       }]
     },
     options: {
@@ -1197,14 +1303,30 @@ function renderComparatorBarChart() {
         presidentialBands: { enabled: false },
         legend: { display: false },
         tooltip: {
+          padding: isMobile ? 8 : 10,
           callbacks: {
             label: (c) => `${ind.shortName}: ${formatValue(c.raw, ind.decimals, ind.unit)}`
           }
         }
       },
       scales: {
-        x: { ticks: { color: textColor, font: { weight: '600', size: 11 } }, grid: { display: false } },
-        y: { ticks: { color: textColor }, grid: { color: gridColor } }
+        x: {
+          ticks: {
+            color: textColor,
+            font: { weight: '600', size: isMobile ? 9.5 : 11 },
+            maxRotation: isMobile ? 45 : 0,
+            minRotation: isMobile ? 30 : 0
+          },
+          grid: { display: false }
+        },
+        y: {
+          ticks: {
+            color: textColor,
+            font: { size: isMobile ? 9.5 : 11 },
+            maxTicksLimit: isMobile ? 6 : 9
+          },
+          grid: { color: gridColor }
+        }
       }
     }
   });
@@ -1220,9 +1342,9 @@ function renderComparatorTable() {
   let thead = `
     <thead>
       <tr>
-        <th>Categoria</th>
-        <th>Indicador</th>
-        <th>Critério Melhor</th>
+        <th class="hide-on-mobile">Categoria</th>
+        <th class="sticky-col">Indicador</th>
+        <th class="hide-on-mobile">Critério Melhor</th>
         ${govs.map(g => `<th style="border-top: 3px solid ${g.color};">${g.name}<br><small style="font-weight:500; opacity:0.8;">${g.startYear}–${g.endYear}</small></th>`).join('')}
       </tr>
     </thead>
@@ -1257,22 +1379,23 @@ function renderComparatorTable() {
 
     tbody += `
       <tr>
-        <td><span style="color:${cat.color}; font-weight:700;">${cat.icon} ${cat.name.split('&')[0]}</span></td>
-        <td>
+        <td class="hide-on-mobile"><span style="color:${cat.color}; font-weight:700;">${cat.icon} ${cat.name.split('&')[0]}</span></td>
+        <td class="sticky-col">
           <strong>${ind.name}</strong>
-          <div style="font-size:0.72rem; color:var(--text-muted);">Unidade: ${ind.unit}</div>
+          <div class="hide-on-mobile" style="font-size:0.72rem; color:var(--text-muted);">Unidade: ${ind.unit}</div>
+          <div class="mobile-ind-sub"><span style="color:${cat.color}; font-weight:700;">${cat.icon}</span> ${ind.unit} • ${polText}</div>
         </td>
-        <td><span style="font-size:0.75rem;">${polText}</span></td>
+        <td class="hide-on-mobile"><span style="font-size:0.75rem;">${polText}</span></td>
         ${govStats.map(gs => {
           const isWinner = ind.polarity !== 'neutral' && Math.abs(gs.val - bestVal) < 0.0001;
           const sign = APP_STATE.comparatorCalcMode === 'delta' && gs.val >= 0 ? '+' : '';
           return `
             <td class="${isWinner ? 'winner-cell' : ''}">
-              <div style="font-size:0.9rem; font-weight:700;">
+              <div style="font-size:0.88rem; font-weight:700; white-space:nowrap;">
                 ${isWinner ? '🏆 ' : ''}${sign}${formatValue(gs.val, ind.decimals, ind.unit)}
               </div>
-              <div style="font-size:0.71rem; color:var(--text-muted);">
-                Início: ${formatValue(gs.st.startVal, ind.decimals, '')} → Fim: ${formatValue(gs.st.endVal, ind.decimals, '')}
+              <div style="font-size:0.7rem; color:var(--text-muted); white-space:nowrap;">
+                ${formatValue(gs.st.startVal, ind.decimals, '')} → ${formatValue(gs.st.endVal, ind.decimals, '')}
               </div>
             </td>
           `;
@@ -1321,6 +1444,7 @@ function computePearsonCorrelation(x, y) {
 }
 
 function renderCorrelationView() {
+  const isMobile = window.innerWidth <= 640;
   const indA = getIndicatorById(document.getElementById('corrSelectA').value);
   const indB = getIndicatorById(document.getElementById('corrSelectB').value);
 
@@ -1393,9 +1517,9 @@ function renderCorrelationView() {
           borderColor: '#3b82f6',
           backgroundColor: '#3b82f633',
           yAxisID: 'y',
-          borderWidth: 3,
+          borderWidth: isMobile ? 2.2 : 3,
           tension: 0.25,
-          pointRadius: 3.5
+          pointRadius: isMobile ? 2 : 3.5
         },
         {
           label: `${indB.shortName} (${indB.unit})`,
@@ -1403,9 +1527,9 @@ function renderCorrelationView() {
           borderColor: '#10b981',
           backgroundColor: '#10b98133',
           yAxisID: APP_STATE.correlationScaleMode === 'norm' ? 'y' : 'y1',
-          borderWidth: 3,
+          borderWidth: isMobile ? 2.2 : 3,
           tension: 0.25,
-          pointRadius: 3.5
+          pointRadius: isMobile ? 2 : 3.5
         }
       ]
     },
@@ -1415,21 +1539,35 @@ function renderCorrelationView() {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         presidentialBands: { enabled: true },
-        legend: { labels: { color: textColor, font: { weight: '700' } } }
+        legend: {
+          labels: {
+            color: textColor,
+            boxWidth: isMobile ? 10 : 24,
+            font: { size: isMobile ? 10 : 12, weight: '700' }
+          }
+        }
       },
       scales: {
-        x: { ticks: { color: textColor }, grid: { color: gridColor } },
+        x: {
+          ticks: {
+            color: textColor,
+            maxRotation: 0,
+            maxTicksLimit: isMobile ? 7 : 14,
+            font: { size: isMobile ? 9.5 : 11 }
+          },
+          grid: { color: gridColor }
+        },
         y: {
           type: 'linear',
           position: 'left',
-          ticks: { color: '#3b82f6' },
+          ticks: { color: '#3b82f6', font: { size: isMobile ? 9.5 : 11 }, maxTicksLimit: isMobile ? 6 : 9 },
           grid: { color: gridColor }
         },
         y1: {
           type: 'linear',
           position: 'right',
           display: APP_STATE.correlationScaleMode === 'dual',
-          ticks: { color: '#10b981' },
+          ticks: { color: '#10b981', font: { size: isMobile ? 9.5 : 11 }, maxTicksLimit: isMobile ? 6 : 9 },
           grid: { drawOnChartArea: false }
         }
       }
@@ -1452,9 +1590,9 @@ function renderCorrelationView() {
       data: pts,
       backgroundColor: m.color,
       borderColor: '#fff',
-      borderWidth: 1.5,
-      pointRadius: 6.5,
-      pointHoverRadius: 9
+      borderWidth: isMobile ? 1 : 1.5,
+      pointRadius: isMobile ? 5 : 6.5,
+      pointHoverRadius: isMobile ? 7 : 9
     };
   }).filter(ds => ds.data.length > 0);
 
@@ -1468,9 +1606,15 @@ function renderCorrelationView() {
         presidentialBands: { enabled: false },
         legend: {
           position: 'bottom',
-          labels: { color: textColor, boxWidth: 10, font: { size: 11, weight: '600' } }
+          labels: {
+            color: textColor,
+            boxWidth: isMobile ? 8 : 10,
+            padding: isMobile ? 7 : 10,
+            font: { size: isMobile ? 9.5 : 11, weight: '600' }
+          }
         },
         tooltip: {
+          padding: isMobile ? 8 : 10,
           callbacks: {
             label: (c) => {
               const pt = c.raw;
@@ -1481,13 +1625,23 @@ function renderCorrelationView() {
       },
       scales: {
         x: {
-          title: { display: true, text: `${indA.name} (${indA.unit})`, color: textColor, font: { weight: '700' } },
-          ticks: { color: textColor },
+          title: {
+            display: true,
+            text: isMobile ? `${indA.shortName} (${indA.unit})` : `${indA.name} (${indA.unit})`,
+            color: textColor,
+            font: { size: isMobile ? 10 : 12, weight: '700' }
+          },
+          ticks: { color: textColor, font: { size: isMobile ? 9.5 : 11 }, maxTicksLimit: isMobile ? 6 : 10 },
           grid: { color: gridColor }
         },
         y: {
-          title: { display: true, text: `${indB.name} (${indB.unit})`, color: textColor, font: { weight: '700' } },
-          ticks: { color: textColor },
+          title: {
+            display: true,
+            text: isMobile ? `${indB.shortName} (${indB.unit})` : `${indB.name} (${indB.unit})`,
+            color: textColor,
+            font: { size: isMobile ? 10 : 12, weight: '700' }
+          },
+          ticks: { color: textColor, font: { size: isMobile ? 9.5 : 11 }, maxTicksLimit: isMobile ? 6 : 9 },
           grid: { color: gridColor }
         }
       }
@@ -1618,6 +1772,7 @@ const REGION_COLORS = {
 };
 
 function renderStatesView() {
+  const isMobile = window.innerWidth <= 640;
   const metricId = document.getElementById('stateMetricSelect').value || 'ideb';
   const regionFilter = document.getElementById('stateRegionFilter').value || 'all';
   const metric = STATE_METRICS.find(m => m.id === metricId) || STATE_METRICS[0];
@@ -1632,6 +1787,13 @@ function renderStatesView() {
     return b[metricId] - a[metricId];
   });
 
+  // Ajusta dinamicamente a altura do wrapper para que os 27 estados nunca fiquem esmagados no mobile
+  const wrapperEl = document.getElementById('statesChartWrapper');
+  if (wrapperEl) {
+    const rowH = isMobile ? 22 : 19;
+    wrapperEl.style.height = `${Math.max(240, filteredStates.length * rowH + 45)}px`;
+  }
+
   const ctx = document.getElementById('statesBarChart').getContext('2d');
   if (statesBarChartInstance) statesBarChartInstance.destroy();
 
@@ -1641,7 +1803,9 @@ function renderStatesView() {
   statesBarChartInstance = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: filteredStates.map((s, idx) => `${idx + 1}º ${s.uf} - ${s.name}`),
+      labels: filteredStates.map((s, idx) =>
+        isMobile ? `${idx + 1}º ${s.uf} (${s.name})` : `${idx + 1}º ${s.uf} - ${s.name}`
+      ),
       datasets: [{
         label: `${metric.name} (${metric.unit})`,
         data: filteredStates.map(s => s[metricId]),
@@ -1660,8 +1824,18 @@ function renderStatesView() {
         legend: { display: false }
       },
       scales: {
-        x: { ticks: { color: textColor }, grid: { color: gridColor } },
-        y: { ticks: { color: textColor, font: { size: 11, weight: '600' } }, grid: { display: false } }
+        x: {
+          ticks: { color: textColor, font: { size: isMobile ? 9.5 : 11 }, maxTicksLimit: isMobile ? 6 : 10 },
+          grid: { color: gridColor }
+        },
+        y: {
+          ticks: {
+            color: textColor,
+            autoSkip: false,
+            font: { size: isMobile ? 9.5 : 11, weight: '600' }
+          },
+          grid: { display: false }
+        }
       }
     }
   });
@@ -1672,7 +1846,7 @@ function renderStatesView() {
     <thead>
       <tr>
         <th>Pos.</th>
-        <th>UF</th>
+        <th class="sticky-col">UF</th>
         <th>Região</th>
         <th>IDEB</th>
         <th>Analfab.</th>
@@ -1691,7 +1865,7 @@ function renderStatesView() {
     html += `
       <tr>
         <td><strong>#${idx + 1}º</strong></td>
-        <td><strong>${s.name} (${s.uf})</strong></td>
+        <td class="sticky-col"><strong>${s.name} (${s.uf})</strong></td>
         <td><span style="color:${regColor}; font-weight:700;">${s.region}</span></td>
         <td>${s.ideb.toFixed(1)}</td>
         <td>${s.analfabetismo.toFixed(1)}%</td>
@@ -1709,7 +1883,7 @@ function renderStatesView() {
 }
 
 // ============================================================================
-// VIEW 6: TABELA HISTÓRICA BRUTA (1990–2024) E EXPORTAÇÃO CSV
+// VIEW 6: TABELA HISTÓRICA BRUTA (1990–2026) E EXPORTAÇÃO CSV
 // ============================================================================
 
 function renderRawDataTable() {
@@ -1720,7 +1894,7 @@ function renderRawDataTable() {
   let thead = `
     <thead>
       <tr>
-        <th>Ano</th>
+        <th class="sticky-col">Ano</th>
         <th>Presidente no Poder</th>
         <th>Partido</th>
         ${inds.map(i => `<th title="${i.name}">${i.shortName}<br><small style="font-weight:400; opacity:0.8;">(${i.unit})</small></th>`).join('')}
@@ -1736,8 +1910,8 @@ function renderRawDataTable() {
 
     tbody += `
       <tr>
-        <td><strong>${yr}</strong></td>
-        <td style="border-left: 4px solid ${mObj.color}; font-weight:700;">${presDisplay}</td>
+        <td class="sticky-col"><strong>${yr}</strong></td>
+        <td style="border-left: 4px solid ${mObj.color}; font-weight:700; white-space:nowrap;">${presDisplay}</td>
         <td><span class="pres-party-tag">${partyDisplay}</span></td>
         ${inds.map(i => `<td>${formatValue(i.values[yrIdx], i.decimals, '')}</td>`).join('')}
       </tr>
@@ -1764,7 +1938,7 @@ function exportFullDatasetCSV() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'brasil_transparente_1990_2024_completo.csv';
+  a.download = 'brasil_transparente_1990_2026_completo.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

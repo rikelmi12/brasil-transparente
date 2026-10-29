@@ -106,7 +106,6 @@ const MANDATES = [
     party: 'PT',
     startYear: 2003,
     endYear: 2006,
-    exactPeriod: '01/01/2003 – 31/12/1906',
     exactPeriod: '01/01/2003 – 31/12/2006',
     color: '#ef4444',
     bgLight: 'rgba(239, 68, 68, 0.14)',

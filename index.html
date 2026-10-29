@@ -2,7 +2,8 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <meta name="theme-color" content="#090d16" id="metaThemeColor" />
   <title>Brasil Transparente — Observatório Histórico de Dados & Governos (1990–2026)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -71,7 +72,7 @@
             <span>até</span>
             <select id="globalEndYear" onchange="onYearRangeChange()"></select>
           </div>
-          <button class="preset-chip" onclick="resetTimelineFilter()">🔄 Mostrar Todos (1990–2026)</button>
+          <button class="preset-chip btn-reset-timeline" onclick="resetTimelineFilter()">🔄 Mostrar Todos (1990–2026)</button>
         </div>
       </div>
       <div class="presidents-timeline" id="presidentsTimelineStrip"></div>
@@ -92,7 +93,7 @@
       </div>
 
       <!-- Grid Principal: Gráfico Interativo + Ranking Presidencial no Indicador -->
-      <div class="explorer-grid">
+      <div class="explorer-grid" id="mainExplorerGrid">
 
         <!-- Coluna Esquerda: Gráfico Principal -->
         <div class="panel-card">
@@ -103,16 +104,16 @@
             </div>
 
             <div class="chart-toolbar">
-              <div class="tool-group" title="Modo de visualização dos valores">
+              <div class="tool-group tool-group-modes" title="Modo de visualização dos valores">
                 <button class="tool-btn active" data-mode="raw" onclick="setMainValueMode('raw')">Valor Real</button>
                 <button class="tool-btn" data-mode="pct_change" onclick="setMainValueMode('pct_change')">Variação Anual (%)</button>
                 <button class="tool-btn" data-mode="mandate_avg" onclick="setMainValueMode('mandate_avg')">Média por Governo</button>
               </div>
-              <div class="tool-group" title="Tipo de gráfico">
+              <div class="tool-group tool-group-charttype" title="Tipo de gráfico">
                 <button class="tool-btn active" data-chart="line" onclick="setMainChartType('line')">Linha</button>
                 <button class="tool-btn" data-chart="bar" onclick="setMainChartType('bar')">Barras</button>
               </div>
-              <div class="tool-group">
+              <div class="tool-group tool-group-bands">
                 <button class="tool-btn active" id="btnToggleBands" onclick="togglePresidentialBands()">🎨 Faixas de Governo</button>
               </div>
             </div>
@@ -161,9 +162,9 @@
          ====================================================================== -->
     <section id="view-comparator" class="view-section">
       <div class="comparator-controls">
-        <div class="section-heading" style="margin-bottom: 0.25rem;">
+        <div class="section-heading comp-top-heading" style="margin-bottom: 0.25rem;">
           <h2>⚖️ Comparador Direto de Governos & Mandatos Presidenciais</h2>
-          <div class="tool-group">
+          <div class="tool-group comp-metric-group">
             <button class="tool-btn active" id="compMetricAvg" onclick="setComparatorCalcMode('avg')">Média no Mandato</button>
             <button class="tool-btn" id="compMetricDelta" onclick="setComparatorCalcMode('delta')">Variação (Início → Fim)</button>
             <button class="tool-btn" id="compMetricEnd" onclick="setComparatorCalcMode('end')">Valor na Entrega (Fim)</button>
@@ -215,15 +216,15 @@
           <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.75rem;">
             Pontuação normalizada onde <strong>100 é o melhor desempenho histórico</strong> do Brasil e 0 o mais crítico em cada eixo temático.
           </p>
-          <div class="chart-canvas-wrapper" style="height: 360px;">
+          <div class="chart-canvas-wrapper chart-canvas-radar" style="height: 360px;">
             <canvas id="comparatorRadarChart"></canvas>
           </div>
         </div>
 
         <div class="panel-card">
-          <div class="section-heading">
+          <div class="section-heading comp-bar-header">
             <h3>📊 Comparação Visual por Indicador</h3>
-            <select id="compBarIndicatorSelect" class="indicator-select" style="max-width: 320px; font-size: 0.85rem; margin-bottom: 0;" onchange="renderComparatorBarChart()"></select>
+            <select id="compBarIndicatorSelect" class="indicator-select comp-bar-select" onchange="renderComparatorBarChart()"></select>
           </div>
           <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.75rem;" id="compBarHelperText">
             Comparando todos os 11 mandatos presidenciais lado a lado neste indicador.
@@ -236,12 +237,12 @@
 
       <!-- Tabela Completa dos 36 Indicadores nos Governos Selecionados -->
       <div class="table-container">
-        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+        <div class="table-header-bar">
           <div>
             <h3 style="font-size: 1rem; font-weight: 800;">📋 Comparativo Completo nos 36 Indicadores</h3>
             <span style="font-size: 0.78rem; color: var(--text-muted);">A célula destacada em verde indica o melhor resultado entre os governos selecionados para cada indicador</span>
           </div>
-          <select id="compTableCategoryFilter" onchange="renderComparatorTable()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.45rem 0.75rem; border-radius: 6px; font-weight: 600;">
+          <select id="compTableCategoryFilter" class="table-filter-select" onchange="renderComparatorTable()">
             <option value="all">Todas as Categorias (36)</option>
             <option value="educacao">🎓 Educação & Ciência</option>
             <option value="seguranca">🛡️ Segurança Pública</option>
@@ -251,6 +252,7 @@
             <option value="ambiente">🌱 Meio Ambiente & Infra</option>
           </select>
         </div>
+        <div class="mobile-table-hint">↔️ Deslize a tabela lateralmente para comparar todos os governos</div>
         <div class="table-scroll">
           <table class="data-table" id="comparatorFullTable"></table>
         </div>
@@ -262,19 +264,19 @@
          ====================================================================== -->
     <section id="view-correlation" class="view-section">
       <div class="correlation-controls">
-        <div>
+        <div class="corr-select-col">
           <label style="display:block; font-size:0.75rem; font-weight:700; color:var(--text-muted); margin-bottom:0.35rem; text-transform:uppercase;">
             Indicador A (Eixo Esquerdo / X)
           </label>
           <select id="corrSelectA" class="indicator-select" style="margin-bottom:0;" onchange="renderCorrelationView()"></select>
         </div>
-        <div>
+        <div class="corr-select-col">
           <label style="display:block; font-size:0.75rem; font-weight:700; color:var(--text-muted); margin-bottom:0.35rem; text-transform:uppercase;">
             Indicador B (Eixo Direito / Y)
           </label>
           <select id="corrSelectB" class="indicator-select" style="margin-bottom:0;" onchange="renderCorrelationView()"></select>
         </div>
-        <div class="tool-group">
+        <div class="tool-group corr-scale-group">
           <button class="tool-btn active" id="corrScaleDual" onclick="setCorrelationScaleMode('dual')">Eixo Duplo Real</button>
           <button class="tool-btn" id="corrScaleNorm" onclick="setCorrelationScaleMode('norm')">Índice Base 0-100</button>
         </div>
@@ -334,16 +336,16 @@
          ====================================================================== -->
     <section id="view-states" class="view-section">
       <div class="comparator-controls">
-        <div class="section-heading" style="margin-bottom: 0.5rem;">
+        <div class="section-heading states-top-heading" style="margin-bottom: 0.5rem;">
           <div>
             <h2>🗺️ Radiografia dos 27 Estados Brasileiros (UFs & Regiões)</h2>
             <p style="font-size: 0.82rem; color: var(--text-muted);">
               Compare todos os estados do Brasil em Educação (IDEB, Analfabetismo), Segurança (Homicídios), Saúde (Expectativa de Vida, Mortalidade Infantil), PIB per capita e Saneamento.
             </p>
           </div>
-          <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
-            <select id="stateMetricSelect" class="indicator-select" style="width: auto; min-width: 260px; margin-bottom: 0;" onchange="renderStatesView()"></select>
-            <select id="stateRegionFilter" class="indicator-select" style="width: auto; min-width: 170px; margin-bottom: 0;" onchange="renderStatesView()">
+          <div class="states-filters-wrap">
+            <select id="stateMetricSelect" class="indicator-select state-metric-select" onchange="renderStatesView()"></select>
+            <select id="stateRegionFilter" class="indicator-select state-region-select" onchange="renderStatesView()">
               <option value="all">Todas as Regiões (27 UFs)</option>
               <option value="Norte">Região Norte (7)</option>
               <option value="Nordeste">Região Nordeste (9)</option>
@@ -360,7 +362,7 @@
           <div class="section-heading">
             <h3 id="stateChartTitle">📊 Ranking Estadual</h3>
           </div>
-          <div class="chart-canvas-wrapper" style="height: 520px;">
+          <div class="chart-canvas-wrapper chart-canvas-states" id="statesChartWrapper" style="height: 520px;">
             <canvas id="statesBarChart"></canvas>
           </div>
         </div>
@@ -369,6 +371,7 @@
           <div class="section-heading">
             <h3>🏆 Tabela Comparativa das 27 UFs</h3>
           </div>
+          <div class="mobile-table-hint" style="margin-bottom: 0.5rem; border-radius: 6px;">↔️ Deslize a tabela lateralmente para ver todos os indicadores estaduais</div>
           <div class="table-scroll" style="max-height: 520px;">
             <table class="data-table" id="statesRankingTable"></table>
           </div>
@@ -381,15 +384,15 @@
          ====================================================================== -->
     <section id="view-table" class="view-section">
       <div class="table-container">
-        <div style="padding: 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div class="table-header-bar">
           <div>
             <h2 style="font-size: 1.1rem; font-weight: 800;">📋 Matriz Histórica Completa (1990–2026 • Todos os Anos, Presidentes e Indicadores)</h2>
             <p style="font-size: 0.8rem; color: var(--text-muted);">
               Consulte todos os números anuais lado a lado ou exporte a base completa em formato CSV para Excel / Google Sheets.
             </p>
           </div>
-          <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
-            <select id="rawTableCategorySelect" onchange="renderRawDataTable()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.5rem 0.8rem; border-radius: 8px; font-weight: 600;">
+          <div class="raw-table-actions">
+            <select id="rawTableCategorySelect" class="table-filter-select" onchange="renderRawDataTable()">
               <option value="all">Todas as Categorias (36 Indicadores)</option>
               <option value="educacao">🎓 Educação & Ciência</option>
               <option value="seguranca">🛡️ Segurança Pública</option>
@@ -398,11 +401,12 @@
               <option value="social">🤝 Social & Desigualdade</option>
               <option value="ambiente">🌱 Meio Ambiente & Infra</option>
             </select>
-            <button class="btn-icon" onclick="exportFullDatasetCSV()" style="background: var(--accent-green); color: #fff; border-color: var(--accent-green);">
+            <button class="btn-icon btn-export-csv" onclick="exportFullDatasetCSV()">
               📥 Baixar CSV Completo
             </button>
           </div>
         </div>
+        <div class="mobile-table-hint">↔️ Deslize lateralmente para consultar os 36 indicadores ano a ano</div>
         <div class="table-scroll" style="max-height: 680px;">
           <table class="data-table" id="rawHistoricalTable"></table>
         </div>
